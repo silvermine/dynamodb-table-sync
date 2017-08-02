@@ -1,0 +1,47 @@
+{
+  "name": "silvermine-dynamodb-table-sync",
+  "version": "0.9.0",
+  "description": "utility script for detecting and (optionally) fixing differences between multiple DynamoDB tables (in the same or different regions)",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha -- -R spec 'tests/**/*.test.js'"
+  },
+  "author": "Jeremy Thomerson",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/silvermine/dynamodb-table-sync.git"
+  },
+  "keywords": [
+    "aws",
+    "dynamodb",
+    "dynamo",
+    "database",
+    "sync",
+    "multiple",
+    "regions",
+    "cross-region",
+    "replication"
+  ],
+  "bugs": {
+    "url": "https://github.com/silvermine/dynamodb-table-sync/issues"
+  },
+  "homepage": "https://github.com/silvermine/dynamodb-table-sync#readme",
+  "dependencies": {
+    "class.extend": "0.9.2",
+    "underscore": "1.8.3"
+  },
+  "devDependencies": {
+    "coveralls": "2.13.1",
+    "eslint": "4.0.0",
+    "eslint-config-silvermine": "1.3.0",
+    "expect.js": "0.3.1",
+    "grunt": "1.0.1",
+    "grunt-eslint": "20.0.0",
+    "istanbul": "0.4.5",
+    "mocha": "3.4.2",
+    "mocha-lcov-reporter": "1.3.0",
+    "rewire": "2.5.2",
+    "sinon": "2.3.5"
+  }
+}
