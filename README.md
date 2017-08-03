@@ -70,6 +70,7 @@ the form `<region>:<table-name>`.
    * `--delete-extra`: a boolean flag, that when present will tell the synchronizer to
      also scan the slave tables and delete any items in them that are not present in the
      master table.
+      * TODO: this flag is not actually implemented yet
       * Note that whereas all other operations can be done by only scanning the master
         table, supplying this option will result in an additional scan of each slave
         table. While the slave is being scanned, additional reads will occur on the master
