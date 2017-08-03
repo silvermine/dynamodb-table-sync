@@ -49,6 +49,9 @@ the form `<region>:<table-name>`.
       * Also note that all tables (the master and all slaves) must have the same key
         schema since we create a key from the items returned by the master table and use
         that key to look up items on the slave table(s).
+   * `--starting-key`: A JSON string of the key to start the scan at. This allows you to
+     restart a scan that had failed previously by supplying one of the previous keys that
+     was logged. Example: `--starting-key '{"hashKey":"abc","rangeKey":"xyz"}'`
    * `--ignore` (or `--ignore-att`): An attribute that should be ignored when comparing an
      item from the master table and the corresponding item in the slave table.
       * As an example of where this might be used, if items are written to each of your

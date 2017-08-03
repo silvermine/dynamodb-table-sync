@@ -6,7 +6,7 @@ var _ = require('underscore'),
     argvOpts, argv, argsFailed, options;
 
 argvOpts = {
-   string: [ 'master', 'slaves', 'ignore-atts' ],
+   string: [ 'master', 'slaves', 'ignore-atts', 'starting-key' ],
    'boolean': [ 'write-missing', 'write-differing', 'delete-extra' ],
    'default': {
       'write-missing': false,
@@ -60,6 +60,12 @@ if (_.isEmpty(argv['ignore-atts'])) {
 
 argv.slaves = _.map(argv.slaves, mapTableName.bind(null, 'slave'));
 
+if (_.isEmpty(argv['starting-key'])) {
+   argv['starting-key'] = undefined;
+} else {
+   argv['starting-key'] = JSON.parse(argv['starting-key']);
+}
+
 if (argsFailed) {
    process.exit(1); // eslint-disable-line no-process-exit
 }
@@ -69,6 +75,7 @@ options = {
    writeDiffering: argv['write-differing'],
    deleteExtra: argv['delete-extra'],
    ignoreAtts: argv['ignore-atts'],
+   startingKey: argv['starting-key'],
 };
 
 if (_.isNumber(argv['scan-limit'])) {

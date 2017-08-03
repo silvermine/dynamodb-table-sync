@@ -218,9 +218,9 @@ module.exports = Class.extend({
     */
    scanTable: function(tableDef, callbackBatchSize, callback) {
       var self = this,
-          itemCount = 0,
+          lastKey = this._opts.startingKey,
           deferred = Q.defer(),
-          lastKey;
+          itemCount = 0;
 
       console.log('Scanning %s', tableDef.id);
 
