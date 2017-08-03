@@ -68,6 +68,9 @@ module.exports = Class.extend({
    run: function() {
       return this._compareTableDescriptions()
          .then(this.compareSlavesToMasterScan.bind(this))
+         .catch(function(err) {
+            console.log('ERROR: encountered an error while comparing tables', err, err.stack);
+         })
          .then(this._outputStats.bind(this));
    },
 
