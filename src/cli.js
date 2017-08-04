@@ -1,12 +1,15 @@
 'use strict';
 
 var _ = require('underscore'),
+    Q = require('q'),
+    AWS = require('aws-sdk'),
     minimist = require('minimist'),
     Synchronizer = require('./Synchronizer'),
+    startupPromise = Q.when(),
     argvOpts, argv, argsFailed, options;
 
 argvOpts = {
-   string: [ 'master', 'slaves', 'ignore-atts', 'starting-key' ],
+   string: [ 'master', 'slaves', 'ignore-atts', 'starting-key', 'profile', 'role-arn', 'mfa-serial', 'mfa-token' ],
    'boolean': [ 'write-missing', 'write-differing', 'delete-extra' ],
    'default': {
       'write-missing': false,
@@ -98,4 +101,32 @@ if (_.isNumber(argv.parallel)) {
    options.parallel = parseInt(argv.parallel, 10);
 }
 
-new Synchronizer(argv.master, argv.slaves, options).run().done();
+if (!_.isEmpty(argv.profile)) {
+   console.log('Setting AWS credentials provider to use profile %s', argv.profile);
+   AWS.config.credentials = new AWS.SharedIniFileCredentials({ profile: argv.profile });
+}
+
+if (!_.isEmpty(argv['role-arn'])) {
+   (function() {
+      var params = { RoleArn: argv['role-arn'] };
+
+      if (_.isEmpty(argv['mfa-serial'])) {
+         console.log('Assuming role %s', params.RoleArn);
+      } else {
+         params.SerialNumber = argv['mfa-serial'];
+         params.TokenCode = argv['mfa-token'];
+         console.log('Assuming role %s with MFA %s (%s)', params.RoleArn, params.SerialNumber, params.TokenCode);
+      }
+
+      AWS.config.credentials = new AWS.TemporaryCredentials(params);
+      // See jthomerson comments on https://github.com/aws/aws-sdk-js/issues/1064
+      // And subsequently: https://github.com/aws/aws-sdk-js/issues/1664
+      startupPromise = Q.ninvoke(AWS.config.credentials, 'refresh');
+   }());
+}
+
+startupPromise
+   .then(function() {
+      return new Synchronizer(argv.master, argv.slaves, options).run();
+   })
+   .done();
