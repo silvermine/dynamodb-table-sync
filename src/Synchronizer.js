@@ -3,7 +3,8 @@
 var _ = require('underscore'),
     Q = require('q'),
     AWS = require('aws-sdk'),
-    Class = require('class.extend');
+    Class = require('class.extend'),
+    Counter = require('./lib/Counter');
 
 module.exports = Class.extend({
 
@@ -31,6 +32,7 @@ module.exports = Class.extend({
          return _.extend({}, def, { id: (def.region + ':' + def.name), docs: this._makeDocClient(def) });
       }.bind(this));
 
+      this._abortScanning = false;
       this._opts = opts;
 
       this._stats = _.reduce(this._slaves, function(stats, slave) {
@@ -69,8 +71,9 @@ module.exports = Class.extend({
       return this._compareTableDescriptions()
          .then(this.compareSlavesToMasterScan.bind(this))
          .catch(function(err) {
+            this._abortScanning = true;
             console.log('ERROR: encountered an error while comparing tables', err, err.stack);
-         })
+         }.bind(this))
          .then(this._outputStats.bind(this));
    },
 
@@ -90,7 +93,7 @@ module.exports = Class.extend({
       // TODO: BatchGetItem will allow up to 100 items per request, but you may have to
       // iterate on UnprocessedKeys if the response would be too large.
       // See http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_BatchGetItem.html
-      return this.scanTable(this._master, 25, function(batch, previousItemCount) {
+      return this.scanTable(this._master, this._opts.batchReadLimit, function(batch, counter) {
          var keys = _.map(batch, self._makeKeyFromItem.bind(self));
 
          return Q.all(_.map(self._slaves, self._batchGetItems.bind(self, keys)))
@@ -102,7 +105,7 @@ module.exports = Class.extend({
             .then(function() {
                console.log(
                   'Status: have compared %d of approximately %d items from the master table to its slaves',
-                  previousItemCount + batch.length,
+                  counter.get() + batch.length,
                   self._master.approxItems
                );
             });
@@ -211,24 +214,52 @@ module.exports = Class.extend({
     * Each time scan is called, the items that are returned are "chunked" into batches
     * matching `callbackBatchSize`. Then the `callback` is invoked, being passed the
     * current batch (an array of items less than or equal to the `callbackBatchSize`) and
-    * the number of items that have been processed prior to this invocation of the
-    * callback.
+    * a counter that is tracking the number of items that have been processed prior to
+    * this invocation of the callback.
     *
     * @param tableDef {object} table definition for the table to scan
     * @param callbackBatchSize {integer} how many items to pass the callback in each batch
     * @param callback {function} the callback to invoke for each batch of items (see
     * above for details on the args passed to the callback)
+    * @see Counter
     */
    scanTable: function(tableDef, callbackBatchSize, callback) {
       var self = this,
-          lastKey = this._opts.startingKey,
-          deferred = Q.defer(),
-          itemCount = 0;
+          counter = new Counter();
 
+      if (this._opts.parallel) {
+         return Q.all(_.times(this._opts.parallel, function(i) {
+            return self._doScan(tableDef, callbackBatchSize, callback, i, counter)
+               .catch(function(err) {
+                  self._abortScanning = true;
+                  throw err;
+               });
+         }));
+      }
+
+      return this._doScan(tableDef, callbackBatchSize, callback);
+   },
+
+   _doScan: function(tableDef, callbackBatchSize, callback, segment, counter) {
+      var self = this,
+          lastKey = this._opts.startingKey,
+          deferred = Q.defer();
+
+      counter = counter || new Counter();
       console.log('Scanning %s', tableDef.id);
 
       function loopOnce() {
          var params = { TableName: tableDef.name, ExclusiveStartKey: lastKey };
+
+         if (self._abortScanning) {
+            console.log('Segment %d is stopping because of an error in another segment scanner', segment);
+            return deferred.resolve(counter.get());
+         }
+
+         if (segment !== undefined) {
+            params.Segment = segment;
+            params.TotalSegments = self._opts.parallel;
+         }
 
          if (self._opts.scanLimit !== undefined) {
             params.Limit = self._opts.scanLimit;
@@ -246,10 +277,10 @@ module.exports = Class.extend({
                   .reduce(function(prev, batch) {
                      return prev
                         .then(function() {
-                           return callback(batch, itemCount);
+                           return callback(batch, counter);
                         })
                         .then(function() {
-                           itemCount = itemCount + batch.length;
+                           counter.increment(batch.length);
                         });
                   }, Q.when())
                   .value()
@@ -258,7 +289,10 @@ module.exports = Class.extend({
                         lastKey = resp.LastEvaluatedKey;
                         Q.nextTick(loopOnce);
                      } else {
-                        deferred.resolve(itemCount);
+                        if (segment !== undefined) {
+                           console.log('Segment %d of %d has completed', segment, self._opts.parallel);
+                        }
+                        deferred.resolve(counter.get());
                      }
                   });
             })

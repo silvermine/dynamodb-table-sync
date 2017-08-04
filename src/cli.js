@@ -63,6 +63,12 @@ argv.slaves = _.map(argv.slaves, mapTableName.bind(null, 'slave'));
 if (_.isEmpty(argv['starting-key'])) {
    argv['starting-key'] = undefined;
 } else {
+   if (argv.parallel) {
+      console.log('ERROR: --starting-key can not be used when using --parallel');
+      console.log('because each segment would need its own starting key.');
+      argsFailed = true;
+   }
+
    argv['starting-key'] = JSON.parse(argv['starting-key']);
 }
 
@@ -80,6 +86,16 @@ options = {
 
 if (_.isNumber(argv['scan-limit'])) {
    options.scanLimit = parseInt(argv['scan-limit'], 10);
+}
+
+if (_.isNumber(argv['batch-read-limit'])) {
+   options.batchReadLimit = parseInt(argv['batch-read-limit'], 10);
+} else {
+   options.batchReadLimit = 50;
+}
+
+if (_.isNumber(argv.parallel)) {
+   options.parallel = parseInt(argv.parallel, 10);
 }
 
 new Synchronizer(argv.master, argv.slaves, options).run().done();

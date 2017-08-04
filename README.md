@@ -65,6 +65,33 @@ the form `<region>:<table-name>`.
    * `--scan-limit`: a number, used to (optionally) limit the number of items returned by
      each call to `scan`. Use this if you need to slow down the scan to stay under your
      provisioned read capacity.
+   * `--batch-read-limit`: a number, by default 50, that is used as the maximum number of
+     items to read from the slave tables in a batch read operation. When a table
+     (generally the master) is being scanned, we use `BatchGetItem` to get the
+     corresponding items out of the other tables to make sure they exist and compare them.
+     At times you may want to lower the number of items we read from those tables to keep
+     the script running within your provisioned capacity. Additionally, on a batch read
+     operation, if the response would be too large, DynamoDB will return "unprocessed
+     keys" - that is, keys that you requested but are not included in the response. This
+     requires recursive querying from the table, which we have not implemented at this
+     time. Thus, if you get an error about `UnprocessedKeys`, you may need to lower this
+     number to keep the responses within the size that DynamoDB can return.
+     does not process any `UnprocessedKeys` that are retu
+   * `--parallel`: a number of parallel scanners that should run concurrently. By default
+     we do a serial scan using a single "thread" (so to speak). However, if you have a
+     larger table and enough provisioned read capacity on the master and all slaves, we
+     can do the scan in parallel. You just specify how many parallel segments you want
+     scanned simultaneously, e.g. `--parallel 8`.
+      * Note that due to how DynamoDB partitions data, if you specify more parallel
+        scanners than you have partitions in your table, some segments may end much sooner
+        than others. I believe that DynamoDB is basically just guessing at some random
+        keys in the partition, and then reading forward from that key until the end of the
+        partition or until it reaches the starting point of another segment. Thus, you may
+        not be "fully parallel" throughout your entire script run. The script will
+        indicate when each segment finishes. For very small tables, some segments may not
+        get any data at all - even from the first call to `scan`.
+      * See
+        https://aws.amazon.com/blogs/aws/amazon-dynamodb-parallel-scans-and-other-good-news/
    * `--write-missing`: a boolean flag, that when present will tell the synchronizer to
      write to the slave table(s) any items that they are missing.
    * `--write-differing`: a boolean flag, that when present will tell the synchronizer to
