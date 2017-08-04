@@ -34,6 +34,47 @@ items that the slave was missing or where the slave's item differed from the mas
 item.
 
 
+### Installing Globally
+
+By installing the library globally (e.g. `npm install -g silvermine-dynamodb-table-sync`),
+you will get a `dynamodb-table-sync` executable in your node bin folder. Assuming you have
+the node bin folder in your path (you probably do if you've ever installed any other npm
+package globally), then you can simply run the command from any folder like this:
+
+```bash
+dynamodb-table-sync -m us-east-1:my-dynamodb-table -s eu-west-1:my-dynamodb-table
+```
+
+Of course, you can use any CLI arguments you want to regardless of where you run the
+script from.
+
+
+### Using Silvermine DynamoDB Table Sync as a Library
+
+You can also use this codebase as a library. Here's a brief example of how to do so:
+
+```js
+var Synchronizer = require('silvermine-dynamodb-table-sync'),
+    synchronizer;
+
+synchronizer = new Synchronizer(
+   { region: 'us-east-1', name: 'my-master-table-name' },
+   [
+      { region: 'us-west-2', name: 'my-slave-1-table-name' },
+      { region: 'eu-west-1', name: 'my-slave-2-table-name' },
+   ],
+   {
+      writeMissing: true,
+      writeDiffering: true,
+   },
+);
+```
+
+See the comments in [src/Synchronizer.js] for more documentation on names of options.
+Since options all map to CLI arguments, see the list of CLI arguments below for details on
+what each option is used for.
+
+
 ## Command Line Flags
 
 Note that everywhere that a table is supplied as a command line argument, it should be in

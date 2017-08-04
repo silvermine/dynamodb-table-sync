@@ -17,6 +17,10 @@ module.exports = Class.extend({
     *    writeDiffering: false,
     *    deleteExtra: false,
     *    ignoreAtts: [ 'attributes', 'to', 'ignore' ],
+    *    startingKey: { hashKey: 'abc', rangeKey: 'xyz' },
+    *    scanLimit: 100,
+    *    batchReadLimit: 50,
+    *    parallel: 4,
     * }
     * ```
     *
@@ -33,7 +37,7 @@ module.exports = Class.extend({
       }.bind(this));
 
       this._abortScanning = false;
-      this._opts = opts;
+      this._opts = _.extend({ batchReadLimit: 50 }, opts);
 
       this._stats = _.reduce(this._slaves, function(stats, slave) {
          stats[slave.id] = { extra: 0, sameAs: 0, differing: 0, missing: 0 };
