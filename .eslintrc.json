@@ -1,5 +1,9 @@
 {
 
-   "extends": "eslint-config-silvermine/node"
+   "extends": "eslint-config-silvermine/node",
+
+   "rules": {
+      "no-console": "off"
+   }
 
 }
