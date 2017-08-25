@@ -22,6 +22,7 @@ module.exports = Class.extend({
     *    scanLimit: 100,
     *    batchReadLimit: 50,
     *    parallel: 4,
+    *    slaveCredentials: AWSCredentialsProvider(...),
     * }
     * ```
     *
@@ -34,7 +35,7 @@ module.exports = Class.extend({
       this._master = _.extend({}, master, { id: (master.region + ':' + master.name), docs: this._makeDocClient(master) });
 
       this._slaves = _.map(slaves, function(def) {
-         return _.extend({}, def, { id: (def.region + ':' + def.name), docs: this._makeDocClient(def) });
+         return _.extend({}, def, { id: (def.region + ':' + def.name), docs: this._makeDocClient(def, opts.slaveCredentials) });
       }.bind(this));
 
       this._abortScanning = false;
@@ -425,7 +426,7 @@ module.exports = Class.extend({
    _compareTableDescriptions: function() {
       var def = Q.defer(),
           describeMaster = this._describeTable(this._master),
-          describeSlaves = Q.all(_.map(this._slaves, this._describeTable.bind(this)));
+          describeSlaves = Q.all(_.map(this._slaves, _.partial(this._describeTable.bind(this), _, this._opts.slaveCredentials)));
 
       function logDescription(title, tableDef, tableDesc) {
          console.log('%s table %s', title, tableDef.id);
@@ -478,8 +479,8 @@ module.exports = Class.extend({
       return def.promise;
    },
 
-   _describeTable: function(tableDef) {
-      var dyn = new AWS.DynamoDB({ region: tableDef.region });
+   _describeTable: function(tableDef, creds) {
+      var dyn = new AWS.DynamoDB({ region: tableDef.region, credentials: creds || AWS.config.credentials });
 
       return Q.ninvoke(dyn, 'describeTable', { TableName: tableDef.name })
          .then(function(resp) {
@@ -487,8 +488,8 @@ module.exports = Class.extend({
          });
    },
 
-   _makeDocClient: function(def) {
-      return new AWS.DynamoDB.DocumentClient({ region: def.region });
+   _makeDocClient: function(def, creds) {
+      return new AWS.DynamoDB.DocumentClient({ region: def.region, credentials: creds || AWS.config.credentials });
    },
 
    _outputStats: function() {

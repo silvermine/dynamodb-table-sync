@@ -10,7 +10,20 @@ var _ = require('underscore'),
     argvOpts, argv, argsFailed, options;
 
 argvOpts = {
-   string: [ 'master', 'slaves', 'ignore-atts', 'starting-key', 'profile', 'role-arn', 'mfa-serial', 'mfa-token' ],
+   string: [
+      'master',
+      'slaves',
+      'ignore-atts',
+      'starting-key',
+      'profile',
+      'role-arn',
+      'mfa-serial',
+      'mfa-token',
+      'slave-profile',
+      'slave-role-arn',
+      'slave-mfa-serial',
+      'slave-mfa-token',
+   ],
    'boolean': [ 'write-missing', 'write-differing', 'scan-for-extra', 'delete-extra' ],
    'default': {
       'write-missing': false,
@@ -104,29 +117,47 @@ if (_.isNumber(argv.parallel)) {
    options.parallel = parseInt(argv.parallel, 10);
 }
 
+function setupRoleRelatedCredentials(argPrefix, msg, masterCreds) {
+   var params = { RoleArn: argv[argPrefix + 'role-arn'] },
+       creds = masterCreds;
+
+   if (_.isEmpty(params.RoleArn)) {
+      return creds;
+   }
+
+   if (_.isEmpty(argv[argPrefix + 'mfa-serial'])) {
+      console.log('Assuming role %s %s', params.RoleArn, msg);
+   } else {
+      params.SerialNumber = argv[argPrefix + 'mfa-serial'];
+      params.TokenCode = argv[argPrefix + 'mfa-token'];
+      console.log('Assuming role %s with MFA %s (%s) %s', params.RoleArn, params.SerialNumber, params.TokenCode, msg);
+   }
+
+   creds = new AWS.TemporaryCredentials(params, masterCreds);
+
+   // See jthomerson comments on https://github.com/aws/aws-sdk-js/issues/1064
+   // And subsequently: https://github.com/aws/aws-sdk-js/issues/1664
+   startupPromise = startupPromise.then(function() {
+      return Q.ninvoke(creds, 'refresh');
+   });
+
+   return creds;
+}
+
+// Set up master table (SDK default) credentials
 if (!_.isEmpty(argv.profile)) {
    console.log('Setting AWS credentials provider to use profile %s', argv.profile);
    AWS.config.credentials = new AWS.SharedIniFileCredentials({ profile: argv.profile });
 }
 
-if (!_.isEmpty(argv['role-arn'])) {
-   (function() {
-      var params = { RoleArn: argv['role-arn'] };
+AWS.config.credentials = setupRoleRelatedCredentials('', 'for master', AWS.config.credentials);
 
-      if (_.isEmpty(argv['mfa-serial'])) {
-         console.log('Assuming role %s', params.RoleArn);
-      } else {
-         params.SerialNumber = argv['mfa-serial'];
-         params.TokenCode = argv['mfa-token'];
-         console.log('Assuming role %s with MFA %s (%s)', params.RoleArn, params.SerialNumber, params.TokenCode);
-      }
-
-      AWS.config.credentials = new AWS.TemporaryCredentials(params);
-      // See jthomerson comments on https://github.com/aws/aws-sdk-js/issues/1064
-      // And subsequently: https://github.com/aws/aws-sdk-js/issues/1664
-      startupPromise = Q.ninvoke(AWS.config.credentials, 'refresh');
-   }());
+if (!_.isEmpty(argv['slave-profile'])) {
+   console.log('Setting AWS credentials provider to use profile %s for slaves', argv['slave-profile']);
+   options.slaveCredentials = new AWS.SharedIniFileCredentials({ profile: argv['slave-profile'] });
 }
+
+options.slaveCredentials = setupRoleRelatedCredentials('slave-', 'for slaves', options.slaveCredentials || AWS.config.credentials);
 
 startupPromise
    .then(function() {
