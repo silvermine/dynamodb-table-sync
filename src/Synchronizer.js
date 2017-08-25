@@ -541,14 +541,14 @@ module.exports = Class.extend({
 
          if (!slaveItem) {
             self._stats[slaveDef.id].missing = self._stats[slaveDef.id].missing + 1;
-            self.slaveMissingItem(masterItem, slaveDef, key);
+            return self.slaveMissingItem(masterItem, slaveDef, key);
          } else if (self.isItemDifferent(masterItem, slaveItem)) {
             self._stats[slaveDef.id].differing = self._stats[slaveDef.id].differing + 1;
-            self.slaveItemDiffers(masterItem, slaveItem, slaveDef, key);
-         } else {
-            self._stats[slaveDef.id].sameAs = self._stats[slaveDef.id].sameAs + 1;
-            self.slaveItemMatchesMaster(masterItem, slaveItem, slaveDef, key);
+            return self.slaveItemDiffers(masterItem, slaveItem, slaveDef, key);
          }
+
+         self._stats[slaveDef.id].sameAs = self._stats[slaveDef.id].sameAs + 1;
+         return self.slaveItemMatchesMaster(masterItem, slaveItem, slaveDef, key);
       }));
    },
 
