@@ -418,6 +418,9 @@ module.exports = Class.extend({
     *    range: 'NameOfRangeKeyFieldIfThereIsOne', // undefined if there is not one
     * }
     * ```
+    *
+    * Additionally updates the table definition in memory to have an `approxItems` field
+    * that has the approximate number of items that DynamoDB reports for the table.
     */
    _compareTableDescriptions: function() {
       var def = Q.defer(),
