@@ -11,10 +11,11 @@ var _ = require('underscore'),
 
 argvOpts = {
    string: [ 'master', 'slaves', 'ignore-atts', 'starting-key', 'profile', 'role-arn', 'mfa-serial', 'mfa-token' ],
-   'boolean': [ 'write-missing', 'write-differing', 'delete-extra' ],
+   'boolean': [ 'write-missing', 'write-differing', 'scan-for-extra', 'delete-extra' ],
    'default': {
       'write-missing': false,
       'write-differing': false,
+      'scan-for-extra': false,
       'delete-extra': false,
    },
    alias: {
@@ -84,6 +85,7 @@ options = {
    writeMissing: argv['write-missing'],
    writeDiffering: argv['write-differing'],
    deleteExtra: argv['delete-extra'],
+   scanForExtra: argv['scan-for-extra'],
    ignoreAtts: argv['ignore-atts'],
    startingKey: argv['starting-key'],
 };

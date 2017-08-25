@@ -15,6 +15,7 @@ module.exports = Class.extend({
     * {
     *    writeMissing: false,
     *    writeDiffering: false,
+    *    scanForExtra: false,
     *    deleteExtra: false,
     *    ignoreAtts: [ 'attributes', 'to', 'ignore' ],
     *    startingKey: { hashKey: 'abc', rangeKey: 'xyz' },
@@ -72,12 +73,21 @@ module.exports = Class.extend({
     * @return {object} statistics on what the operation completed
     */
    run: function() {
+      var self = this;
+
       return this._compareTableDescriptions()
          .then(this.compareSlavesToMasterScan.bind(this))
+         .then(function() {
+            if (self._opts.scanForExtra || self._opts.deleteExtra) {
+               return _.reduce(self._slaves, function(prev, slaveDef) {
+                  return prev.then(self.scanSlaveForExtraItems.bind(self, slaveDef));
+               }, Q.when());
+            }
+         })
          .catch(function(err) {
-            this._abortScanning = true;
+            self._abortScanning = true;
             console.log('ERROR: encountered an error while comparing tables', err, err.stack);
-         }.bind(this))
+         })
          .then(this._outputStats.bind(this));
    },
 
@@ -100,7 +110,7 @@ module.exports = Class.extend({
       return this.scanTable(this._master, this._opts.batchReadLimit, function(batch, counter) {
          var keys = _.map(batch, self._makeKeyFromItem.bind(self));
 
-         return Q.all(_.map(self._slaves, self._batchGetItems.bind(self, keys)))
+         return Q.all(_.map(self._slaves, self._batchGetItems.bind(self, keys, false)))
             .then(function(slaveBatches) {
                return Q.all(_.map(slaveBatches, function(slaveBatch, i) {
                   return self._compareBatch(batch, self._slaves[i], slaveBatch);
@@ -114,6 +124,49 @@ module.exports = Class.extend({
                );
             });
       });
+   },
+
+   /**
+    * Scans the provided slave table comparing every item that it contains to the master
+    * table. If items are found in the slave that do not exist in the master table,
+    * `slaveExtraItem` will be called to handle the extra item (possibly deleting it from
+    * the slave).
+    *
+    * @see Synchronizer#slaveExtraItem
+    */
+   scanSlaveForExtraItems: function(slaveDef) {
+      var self = this;
+
+      console.log('\nStarting to scan slave %s for extra items', slaveDef.id);
+
+      // Remember that in this function we are only comparing keys (we pass `true` to both
+      // `scanTable` and `_batchGetItems`) because we are simply looking for items on the
+      // slave that do not exist in the master.
+
+      return this.scanTable(slaveDef, this._opts.batchReadLimit, function(slaveBatch, counter) {
+         return self._batchGetItems(slaveBatch, true, self._master)
+            .then(self._compareForExtraItems.bind(self, slaveDef, slaveBatch))
+            .then(function() {
+               console.log(
+                  'Status: have compared %d of approximately %d items from the slave table to the master',
+                  counter.get() + slaveBatch.length,
+                  slaveDef.approxItems
+               );
+            });
+      }, true);
+   },
+
+   _compareForExtraItems: function(slaveDef, slaveBatch, masterBatch) {
+      var self = this;
+
+      return Q.all(_.map(slaveBatch, function(slaveKey) {
+         var masterKey = _.findWhere(masterBatch, slaveKey);
+
+         if (!masterKey) {
+            self._stats[slaveDef.id].extra = self._stats[slaveDef.id].extra + 1;
+            return self.slaveExtraItem(slaveKey, slaveDef);
+         }
+      }));
    },
 
    /**
@@ -199,6 +252,25 @@ module.exports = Class.extend({
    },
 
    /**
+    * This method is called each time the comparison operation finds an item that exists
+    * on the slave that does not exist on the master. If the `deleteExtra` option is set
+    * to true, this will delete the item from the slave.
+    *
+    * @param key {object} the DynamoDB key (hash and range if applicable) of the item that
+    * exists in the slave table but not in the master table
+    * @param slaveDef {object} the table definition for the slave table
+    * @returns {Promise} that is fulfilled when it is done processing the items (it is not
+    * necessary to return a promise if you are not doing any processing)
+    */
+   slaveExtraItem: function(key, slaveDef) {
+      console.log('ERROR: slave %s had an item that was not in the master table: %j', slaveDef.id, key);
+
+      if (this._opts.deleteExtra) {
+         return this.deleteItem(key, slaveDef);
+      }
+   },
+
+   /**
     * Writes an item to a table.
     *
     * @param item {object} the item to write
@@ -207,6 +279,19 @@ module.exports = Class.extend({
    writeItem: function(item, tableDef) {
       console.log('Writing item to %s: %j', tableDef.id, this._makeKeyFromItem(item));
       return Q.ninvoke(tableDef.docs, 'put', { TableName: tableDef.name, Item: item });
+   },
+
+   /**
+    * Deletes an item from a table.
+    *
+    * @param key {object} the key of the item to delete - should contain hash and sort
+    * keys if the table uses both, otherwise just the hash key
+    * @param tableDef {object} the table definition for the table to delete from
+    */
+   deleteItem: function(key, tableDef) {
+      console.log('Deleting item from %s: %j', tableDef.id, key);
+
+      return Q.ninvoke(tableDef.docs, 'delete', { TableName: tableDef.name, Key: key });
    },
 
    /**
@@ -225,15 +310,16 @@ module.exports = Class.extend({
     * @param callbackBatchSize {integer} how many items to pass the callback in each batch
     * @param callback {function} the callback to invoke for each batch of items (see
     * above for details on the args passed to the callback)
+    * @param [keysOnly] {boolean} if true, returns only the keys of the items
     * @see Counter
     */
-   scanTable: function(tableDef, callbackBatchSize, callback) {
+   scanTable: function(tableDef, callbackBatchSize, callback, keysOnly) {
       var self = this,
           counter = new Counter();
 
       if (this._opts.parallel) {
          return Q.all(_.times(this._opts.parallel, function(i) {
-            return self._doScan(tableDef, callbackBatchSize, callback, i, counter)
+            return self._doScan(tableDef, keysOnly, callbackBatchSize, callback, i, counter)
                .catch(function(err) {
                   self._abortScanning = true;
                   throw err;
@@ -241,10 +327,10 @@ module.exports = Class.extend({
          }));
       }
 
-      return this._doScan(tableDef, callbackBatchSize, callback);
+      return this._doScan(tableDef, keysOnly, callbackBatchSize, callback);
    },
 
-   _doScan: function(tableDef, callbackBatchSize, callback, segment, counter) {
+   _doScan: function(tableDef, keysOnly, callbackBatchSize, callback, segment, counter) { // eslint-disable-line max-params
       var self = this,
           lastKey = this._opts.startingKey,
           deferred = Q.defer();
@@ -254,6 +340,10 @@ module.exports = Class.extend({
 
       function loopOnce() {
          var params = { TableName: tableDef.name, ExclusiveStartKey: lastKey };
+
+         if (keysOnly) {
+            params.AttributesToGet = _.values(tableDef.schema);
+         }
 
          if (self._abortScanning) {
             console.log('Segment %d is stopping because of an error in another segment scanner', segment);
@@ -406,7 +496,7 @@ module.exports = Class.extend({
 
          console.log('\n%s', slave.id);
          console.log('Had %d items that were the same as the master', stats.sameAs);
-         if (this._opts.deleteExtra) {
+         if (this._opts.deleteExtra || this._opts.scanForExtra) {
             console.log('Had %d items more than master', stats.extra);
          } else {
             console.log('(we did not scan the slave to find if it had "extra" items that the master does not have)');
@@ -418,10 +508,14 @@ module.exports = Class.extend({
       return this._stats;
    },
 
-   _batchGetItems: function(keys, tableDef) {
+   _batchGetItems: function(keys, keysOnly, tableDef) {
       var params = { RequestItems: {} };
 
       params.RequestItems[tableDef.name] = { Keys: keys };
+
+      if (keysOnly) {
+         params.RequestItems[tableDef.name].AttributesToGet = _.values(tableDef.schema);
+      }
 
       return Q.ninvoke(tableDef.docs, 'batchGet', params)
          .then(function(resp) {
