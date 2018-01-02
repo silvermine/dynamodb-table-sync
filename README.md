@@ -117,7 +117,6 @@ the form `<region>:<table-name>`.
      requires recursive querying from the table, which we have not implemented at this
      time. Thus, if you get an error about `UnprocessedKeys`, you may need to lower this
      number to keep the responses within the size that DynamoDB can return.
-     does not process any `UnprocessedKeys` that are retu
    * `--parallel`: a number of parallel scanners that should run concurrently. By default
      we do a serial scan using a single "thread" (so to speak). However, if you have a
      larger table and enough provisioned read capacity on the master and all slaves, we
