@@ -24,8 +24,9 @@ argvOpts = {
       'slave-mfa-serial',
       'slave-mfa-token',
    ],
-   'boolean': [ 'write-missing', 'write-differing', 'scan-for-extra', 'delete-extra' ],
+   'boolean': [ 'write-missing', 'write-differing', 'scan-for-extra', 'delete-extra', 'verbose' ],
    'default': {
+      'verbose': false,
       'write-missing': false,
       'write-differing': false,
       'scan-for-extra': false,
@@ -34,6 +35,7 @@ argvOpts = {
    alias: {
       master: 'm',
       slaves: [ 's', 'slave' ],
+      verbose: 'v',
       'ignore-atts': [ 'ignore', 'ignore-att' ],
    },
 };
@@ -95,6 +97,7 @@ if (argsFailed) {
 }
 
 options = {
+   verbose: argv.verbose,
    writeMissing: argv['write-missing'],
    writeDiffering: argv['write-differing'],
    deleteExtra: argv['delete-extra'],
