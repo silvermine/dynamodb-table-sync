@@ -4,7 +4,8 @@ var _ = require('underscore'),
     Q = require('q'),
     AWS = require('aws-sdk'),
     Class = require('class.extend'),
-    Counter = require('./lib/Counter');
+    Counter = require('./lib/Counter'),
+    REPLICATION_FIELDS = [ 'aws:rep:updateregion', 'aws:rep:updatetime', 'aws:rep:deleting' ];
 
 module.exports = Class.extend({
 
@@ -185,12 +186,7 @@ module.exports = Class.extend({
     * same
     */
    isItemDifferent: function(masterItem, slaveItem) {
-      var atts = this._opts.ignoreAtts;
-
-      if (_.isEmpty(atts)) {
-         return !_.isEqual(masterItem, slaveItem);
-      }
-
+      var atts = _.union(this._opts.ignoreAtts, REPLICATION_FIELDS);
 
       return !_.isEqual(_.omit(masterItem, atts), _.omit(slaveItem, atts));
    },
@@ -279,7 +275,7 @@ module.exports = Class.extend({
     */
    writeItem: function(item, tableDef) {
       console.log('Writing item to %s: %j', tableDef.id, this._makeKeyFromItem(item));
-      return Q.ninvoke(tableDef.docs, 'put', { TableName: tableDef.name, Item: item });
+      return Q.ninvoke(tableDef.docs, 'put', { TableName: tableDef.name, Item: _.omit(item, REPLICATION_FIELDS) });
    },
 
    /**
