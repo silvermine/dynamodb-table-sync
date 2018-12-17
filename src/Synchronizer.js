@@ -93,6 +93,40 @@ module.exports = Class.extend({
          .then(this._outputStats.bind(this));
    },
 
+   trackScanProgress: function(enabled, approxItems, f) {
+      var tick = approxItems > 100 ? 1 : 5,
+          currentPercent = 0,
+          nextProgressPercent = 0,
+          ret;
+
+      ret = f(function(currentItems) {
+         if (!enabled) {
+            return;
+         }
+
+         currentPercent = Math.round(currentItems / approxItems * 100.0);
+
+         if (currentPercent < 100 && currentPercent >= (nextProgressPercent + tick)) {
+            process.stdout.clearLine();
+            process.stdout.cursorTo(0);
+            process.stdout.write('(' + currentPercent + '%)');
+
+            nextProgressPercent =
+               currentPercent >= (nextProgressPercent + tick) ?
+               (nextProgressPercent + tick) :
+               (currentPercent + tick);
+         } else {
+            process.stdout.write('.');
+         }
+      });
+
+      return ret.then(function() {
+         process.stdout.clearLine();
+         process.stdout.cursorTo(0);
+         process.stdout.write('(100%)\n');
+      });
+   },
+
    /**
     * Scans the master table, and for each batch of items that the master table has in it,
     * queries the slaves to see if they contain the exact same items. If an item is
@@ -109,26 +143,35 @@ module.exports = Class.extend({
       // TODO: BatchGetItem will allow up to 100 items per request, but you may have to
       // iterate on UnprocessedKeys if the response would be too large.
       // See http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_BatchGetItem.html
-      return this.scanTable(this._master, this._opts.batchReadLimit, function(batch, counter) {
-         var keys = _.map(batch, self._makeKeyFromItem.bind(self));
+      return this.trackScanProgress(!self._opts.verbose, self._master.approxItems, function(trackProgress) {
+         return self.scanTable(self._master, self._opts.batchReadLimit, function(batch, counter) {
+            var keys = _.map(batch, self._makeKeyFromItem.bind(self));
 
-         return Q.all(_.map(self._slaves, self._batchGetItems.bind(self, keys, false)))
-            .then(function(slaveBatches) {
-               return Q.all(_.map(slaveBatches, function(slaveBatch, i) {
-                  return self._compareBatch(batch, self._slaves[i], slaveBatch);
-               }));
-            })
-            .then(function() {
-               if (self._opts.verbose) {
-                  console.log(
-                     'Status: have compared %d of approximately %d items from the master table to its slaves',
-                     counter.get() + batch.length,
-                     self._master.approxItems
-                  );
-               } else {
-                  process.stdout.write('.');
-               }
-            });
+            return Q.all(_.map(self._slaves, self._batchGetItems.bind(self, keys, false)))
+               .then(function(slaveBatches) {
+                  return Q.all(_.map(slaveBatches, function(slaveBatch, i) {
+                     return self._compareBatch(batch, self._slaves[i], slaveBatch);
+                  }));
+               })
+               .then(function() {
+                  if (self._opts.verbose) {
+                     console.log(
+                        'Status: have compared %d of approximately %d items from the master table to its slaves',
+                        counter.get() + batch.length,
+                        self._master.approxItems
+                     );
+                  } else {
+                     if (counter.get() === 0) {
+                        console.log(
+                           'Status: Comparing approximately %d items from the master table to its slaves',
+                           self._master.approxItems
+                        );
+                     }
+
+                     trackProgress(counter.get() + batch.length);
+                  }
+               });
+         });
       });
    },
 
@@ -143,27 +186,37 @@ module.exports = Class.extend({
    scanSlaveForExtraItems: function(slaveDef) {
       var self = this;
 
-      if (this._opts.verbose) {
-         console.log('\nStarting to scan slave %s for extra items', slaveDef.id);
-      }
+      console.log('\nStarting to scan slave %s for extra items', slaveDef.id);
 
       // Remember that in this function we are only comparing keys (we pass `true` to both
       // `scanTable` and `_batchGetItems`) because we are simply looking for items on the
       // slave that do not exist in the master.
 
-      return this.scanTable(slaveDef, this._opts.batchReadLimit, function(slaveBatch, counter) {
-         return self._batchGetItems(slaveBatch, true, self._master)
-            .then(self._compareForExtraItems.bind(self, slaveDef, slaveBatch))
-            .then(function() {
-               if (this._opts.verbose) {
-                  console.log(
-                     'Status: have compared %d of approximately %d items from the slave table to the master',
-                     counter.get() + slaveBatch.length,
-                     slaveDef.approxItems
-                  );
-               }
-            });
-      }, true);
+      return this.trackScanProgress(!self._opts.verbose, slaveDef.approxItems, function(trackProgress) {
+         return self.scanTable(slaveDef, self._opts.batchReadLimit, function(slaveBatch, counter) {
+            return self._batchGetItems(slaveBatch, true, self._master)
+               .then(self._compareForExtraItems.bind(self, slaveDef, slaveBatch))
+               .then(function() {
+                  if (self._opts.verbose) {
+                     console.log(
+                        'Status: have compared %d of approximately %d items from the slave table to the master',
+                        counter.get() + slaveBatch.length,
+                        slaveDef.approxItems
+                     );
+                  } else {
+                    // Simple . increment w/% logging
+                     if (counter.get() === 0) {
+                        console.log(
+                           'Status: Comparing approximately %d items from the slave table to the master',
+                           slaveDef.approxItems
+                        );
+                     }
+
+                     trackProgress(counter.get() + slaveBatch.length);
+                  }
+               });
+         }, true);
+      });
    },
 
    _compareForExtraItems: function(slaveDef, slaveBatch, masterBatch) {
@@ -355,9 +408,7 @@ module.exports = Class.extend({
 
       counter = counter || new Counter();
 
-      if (this._opts.verbose) {
-         console.log('Scanning %s', tableDef.id);
-      }
+      console.log('Scanning %s', tableDef.id);
 
       function loopOnce() {
          var params = { TableName: tableDef.name, ExclusiveStartKey: lastKey };
