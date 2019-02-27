@@ -36,7 +36,7 @@ item.
 
 ### Installing Globally
 
-By installing the library globally (e.g. `npm install -g silvermine-dynamodb-table-sync`),
+By installing the library globally (e.g. `npm install -g @silvermine/dynamodb-table-sync`),
 you will get a `dynamodb-table-sync` executable in your node bin folder. Assuming you have
 the node bin folder in your path (you probably do if you've ever installed any other npm
 package globally), then you can simply run the command from any folder like this:
@@ -54,7 +54,7 @@ script from.
 You can also use this codebase as a library. Here's a brief example of how to do so:
 
 ```js
-var Synchronizer = require('silvermine-dynamodb-table-sync'),
+var Synchronizer = require('@silvermine/dynamodb-table-sync'),
     synchronizer;
 
 synchronizer = new Synchronizer(
