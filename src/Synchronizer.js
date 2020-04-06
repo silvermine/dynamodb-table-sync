@@ -88,9 +88,43 @@ module.exports = Class.extend({
          })
          .catch(function(err) {
             self._abortScanning = true;
-            console.log('ERROR: encountered an error while comparing tables', err, err.stack);
+            console.error('Encountered an error while comparing tables', err, err.stack);
          })
          .then(this._outputStats.bind(this));
+   },
+
+   trackScanProgress: function(enabled, approxItems, f) {
+      var tick = approxItems > 100 ? 1 : 5,
+          currentPercent = 0,
+          nextProgressPercent = 0,
+          ret;
+
+      ret = f(function(currentItems) {
+         if (!enabled) {
+            return;
+         }
+
+         currentPercent = Math.round(currentItems / approxItems * 100.0);
+
+         if (currentPercent < 100 && currentPercent >= (nextProgressPercent + tick)) {
+            process.stdout.clearLine();
+            process.stdout.cursorTo(0);
+            process.stdout.write('(' + currentPercent + '%)');
+
+            nextProgressPercent =
+               currentPercent >= (nextProgressPercent + tick) ?
+               (nextProgressPercent + tick) :
+               (currentPercent + tick);
+         } else {
+            process.stdout.write('.');
+         }
+      });
+
+      return ret.then(function() {
+         process.stdout.clearLine();
+         process.stdout.cursorTo(0);
+         process.stdout.write('(100%)\n');
+      });
    },
 
    /**
@@ -109,22 +143,35 @@ module.exports = Class.extend({
       // TODO: BatchGetItem will allow up to 100 items per request, but you may have to
       // iterate on UnprocessedKeys if the response would be too large.
       // See http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_BatchGetItem.html
-      return this.scanTable(this._master, this._opts.batchReadLimit, function(batch, counter) {
-         var keys = _.map(batch, self._makeKeyFromItem.bind(self));
+      return this.trackScanProgress(!self._opts.verbose, self._master.approxItems, function(trackProgress) {
+         return self.scanTable(self._master, self._opts.batchReadLimit, function(batch, counter) {
+            var keys = _.map(batch, self._makeKeyFromItem.bind(self));
 
-         return Q.all(_.map(self._slaves, self._batchGetItems.bind(self, keys, false)))
-            .then(function(slaveBatches) {
-               return Q.all(_.map(slaveBatches, function(slaveBatch, i) {
-                  return self._compareBatch(batch, self._slaves[i], slaveBatch);
-               }));
-            })
-            .then(function() {
-               console.log(
-                  'Status: have compared %d of approximately %d items from the master table to its slaves',
-                  counter.get() + batch.length,
-                  self._master.approxItems
-               );
-            });
+            return Q.all(_.map(self._slaves, self._batchGetItems.bind(self, keys, false)))
+               .then(function(slaveBatches) {
+                  return Q.all(_.map(slaveBatches, function(slaveBatch, i) {
+                     return self._compareBatch(batch, self._slaves[i], slaveBatch);
+                  }));
+               })
+               .then(function() {
+                  if (self._opts.verbose) {
+                     console.log(
+                        'Status: have compared %d of approximately %d items from the master table to its slaves',
+                        counter.get() + batch.length,
+                        self._master.approxItems
+                     );
+                  } else {
+                     if (counter.get() === 0) {
+                        console.log(
+                           'Status: Comparing approximately %d items from the master table to its slaves',
+                           self._master.approxItems
+                        );
+                     }
+
+                     trackProgress(counter.get() + batch.length);
+                  }
+               });
+         });
       });
    },
 
@@ -145,17 +192,31 @@ module.exports = Class.extend({
       // `scanTable` and `_batchGetItems`) because we are simply looking for items on the
       // slave that do not exist in the master.
 
-      return this.scanTable(slaveDef, this._opts.batchReadLimit, function(slaveBatch, counter) {
-         return self._batchGetItems(slaveBatch, true, self._master)
-            .then(self._compareForExtraItems.bind(self, slaveDef, slaveBatch))
-            .then(function() {
-               console.log(
-                  'Status: have compared %d of approximately %d items from the slave table to the master',
-                  counter.get() + slaveBatch.length,
-                  slaveDef.approxItems
-               );
-            });
-      }, true);
+      return this.trackScanProgress(!self._opts.verbose, slaveDef.approxItems, function(trackProgress) {
+         return self.scanTable(slaveDef, self._opts.batchReadLimit, function(slaveBatch, counter) {
+            return self._batchGetItems(slaveBatch, true, self._master)
+               .then(self._compareForExtraItems.bind(self, slaveDef, slaveBatch))
+               .then(function() {
+                  if (self._opts.verbose) {
+                     console.log(
+                        'Status: have compared %d of approximately %d items from the slave table to the master',
+                        counter.get() + slaveBatch.length,
+                        slaveDef.approxItems
+                     );
+                  } else {
+                    // Simple . increment w/% logging
+                     if (counter.get() === 0) {
+                        console.log(
+                           'Status: Comparing approximately %d items from the slave table to the master',
+                           slaveDef.approxItems
+                        );
+                     }
+
+                     trackProgress(counter.get() + slaveBatch.length);
+                  }
+               });
+         }, true);
+      });
    },
 
    _compareForExtraItems: function(slaveDef, slaveBatch, masterBatch) {
@@ -203,7 +264,10 @@ module.exports = Class.extend({
     * is not necessary to return a promise if you are not doing any processing)
     */
    slaveMissingItem: function(masterItem, slaveDef, key) {
-      console.log('ERROR: %s is missing item present in master table: %j', slaveDef.id, key);
+      if (this._opts.verbose) {
+         console.warn('%s is missing item present in master table: %j', slaveDef.id, key);
+      }
+
       if (this._opts.writeMissing) {
          return this.writeItem(masterItem, slaveDef);
       }
@@ -223,7 +287,10 @@ module.exports = Class.extend({
     * (it is not necessary to return a promise if you are not doing any processing)
     */
    slaveItemDiffers: function(masterItem, slaveItem, slaveDef, key) {
-      console.log('ERROR: item in %s differs from same item in master table: %j', slaveDef.id, key);
+      if (this._opts.verbose) {
+         console.warn('Item in %s differs from same item in master table: %j', slaveDef.id, key);
+      }
+
       // TODO: output the differences
       // console.log('master', masterItem);
       // console.log('slave', slaveItem);
@@ -260,7 +327,9 @@ module.exports = Class.extend({
     * necessary to return a promise if you are not doing any processing)
     */
    slaveExtraItem: function(key, slaveDef) {
-      console.log('ERROR: slave %s had an item that was not in the master table: %j', slaveDef.id, key);
+      if (this._opts.verbose) {
+         console.warn('Slave %s had an item that was not in the master table: %j', slaveDef.id, key);
+      }
 
       if (this._opts.deleteExtra) {
          return this.deleteItem(key, slaveDef);
@@ -274,7 +343,10 @@ module.exports = Class.extend({
     * @param tableDef {object} the table definition for the table to write to
     */
    writeItem: function(item, tableDef) {
-      console.log('Writing item to %s: %j', tableDef.id, this._makeKeyFromItem(item));
+      if (this._opts.verbose) {
+         console.log('Writing item to %s: %j', tableDef.id, this._makeKeyFromItem(item));
+      }
+
       return Q.ninvoke(tableDef.docs, 'put', { TableName: tableDef.name, Item: _.omit(item, REPLICATION_FIELDS) });
    },
 
@@ -286,7 +358,9 @@ module.exports = Class.extend({
     * @param tableDef {object} the table definition for the table to delete from
     */
    deleteItem: function(key, tableDef) {
-      console.log('Deleting item from %s: %j', tableDef.id, key);
+      if (this._opts.verbose) {
+         console.log('Deleting item from %s: %j', tableDef.id, key);
+      }
 
       return Q.ninvoke(tableDef.docs, 'delete', { TableName: tableDef.name, Key: key });
    },
@@ -333,6 +407,7 @@ module.exports = Class.extend({
           deferred = Q.defer();
 
       counter = counter || new Counter();
+
       console.log('Scanning %s', tableDef.id);
 
       function loopOnce() {
@@ -343,7 +418,7 @@ module.exports = Class.extend({
          }
 
          if (self._abortScanning) {
-            console.log('Segment %d is stopping because of an error in another segment scanner', segment);
+            console.error('Segment %d is stopping because of an error in another segment scanner', segment);
             return deferred.resolve(counter.get());
          }
 
@@ -381,7 +456,9 @@ module.exports = Class.extend({
                         Q.nextTick(loopOnce);
                      } else {
                         if (segment !== undefined) {
-                           console.log('Segment %d of %d has completed', segment, self._opts.parallel);
+                           if (self._opts.verbose) {
+                              console.log('Segment %d of %d has completed', segment, self._opts.parallel);
+                           }
                         }
                         deferred.resolve(counter.get());
                      }
@@ -463,7 +540,7 @@ module.exports = Class.extend({
          }.bind(this))
          .then(function(unlikeTables) {
             if (!_.isEmpty(unlikeTables)) {
-               console.log('ERROR: the following slave tables have key schemas that do not match the master table:', unlikeTables);
+               console.error('The following slave tables have key schemas that do not match the master table:', unlikeTables);
                return def.reject(unlikeTables);
             }
 
@@ -499,7 +576,7 @@ module.exports = Class.extend({
          if (this._opts.deleteExtra || this._opts.scanForExtra) {
             console.log('Had %d items more than master', stats.extra);
          } else {
-            console.log('(we did not scan the slave to find if it had "extra" items that the master does not have)');
+            console.log('(We did not scan the slave to find if it had "extra" items that the master does not have)');
          }
          console.log('Had %d items that were different from the master', stats.differing);
          console.log('Was missing %d items that the master had', stats.missing);
@@ -520,7 +597,7 @@ module.exports = Class.extend({
       return Q.ninvoke(tableDef.docs, 'batchGet', params)
          .then(function(resp) {
             if (!_.isEmpty(resp.UnprocessedKeys)) {
-               throw new Error('ERROR: unprocessed keys in batchGet'); // TODO: recursive querying as needed
+               throw new Error('Unprocessed keys in batchGet'); // TODO: recursive querying as needed
             }
 
             return resp.Responses[tableDef.name];
@@ -530,7 +607,9 @@ module.exports = Class.extend({
    _compareBatch: function(masterBatch, slaveDef, slaveBatch) {
       var self = this;
 
-      console.log('Comparing batch of %d from master to %d from slave %s', masterBatch.length, slaveBatch.length, slaveDef.id);
+      if (this._opts.verbose) {
+         console.log('Comparing batch of %d from master to %d from slave %s', masterBatch.length, slaveBatch.length, slaveDef.id);
+      }
 
       return Q.all(_.map(masterBatch, function(masterItem) {
          var key = self._makeKeyFromItem(masterItem),

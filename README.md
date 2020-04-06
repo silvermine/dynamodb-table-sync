@@ -170,6 +170,9 @@ the form `<region>:<table-name>`.
      requires an MFA token (can only be used with `--role-arn` **and** `--mfa-serial`).
    * `--slave-profile`, `--slave-role-arn`, `--slave-mfa-serial`, and `--slave-mfa-token`
      - see the subheading "Syncing Tables in Two Accounts" for more information.
+  * `--verbose` (or `-v`) enables additional verbose info & warnings to console logger on
+     specific item discrepancies and actions being performed.
+
 
 
 ### Syncing Tables in Two Accounts
