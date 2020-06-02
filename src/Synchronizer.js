@@ -1,6 +1,7 @@
 'use strict';
 
-var _ = require('underscore'),
+var readline = require('readline'),
+    _ = require('underscore'),
     Q = require('q'),
     AWS = require('aws-sdk'),
     Class = require('class.extend'),
@@ -107,8 +108,8 @@ module.exports = Class.extend({
          currentPercent = Math.round(currentItems / approxItems * 100.0);
 
          if (currentPercent < 100 && currentPercent >= (nextProgressPercent + tick)) {
-            process.stdout.clearLine();
-            process.stdout.cursorTo(0);
+            readline.clearLine(process.stdout);
+            readline.cursorTo(process.stdout, 0);
             process.stdout.write('(' + currentPercent + '%)');
 
             nextProgressPercent =
@@ -121,8 +122,8 @@ module.exports = Class.extend({
       });
 
       return ret.then(function() {
-         process.stdout.clearLine();
-         process.stdout.cursorTo(0);
+         readline.clearLine(process.stdout);
+         readline.cursorTo(process.stdout, 0);
          process.stdout.write('(100%)\n');
       });
    },
