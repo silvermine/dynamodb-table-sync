@@ -35,11 +35,11 @@
     "npm": "6.4.1"
   },
   "dependencies": {
-    "aws-sdk": "2.94.0",
+    "aws-sdk": "2.690.0",
     "class.extend": "0.9.2",
-    "minimist": "1.2.0",
+    "minimist": "1.2.5",
     "q": "1.5.1",
-    "underscore": "1.8.3"
+    "underscore": "1.10.2"
   },
   "devDependencies": {
     "coveralls": "3.0.2",
