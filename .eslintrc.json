@@ -1,6 +1,6 @@
 {
 
-   "extends": "eslint-config-silvermine/node",
+   "extends": "@silvermine/eslint-config/node",
 
    "rules": {
       "no-console": "off"
