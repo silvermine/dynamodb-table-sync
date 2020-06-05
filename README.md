@@ -34,6 +34,33 @@ items that the slave was missing or where the slave's item differed from the mas
 item.
 
 
+### Running in Docker
+
+Build the image:
+
+```sh
+docker-compose build
+```
+
+Then run the container:
+
+```sh
+docker-compose run \
+   --rm \
+   --user node \
+   --volume "${HOME}/.aws:/home/node/.aws"
+   -e AWS_ACCESS_KEY_ID="XXXXX" \
+   -e AWS_SECRET_ACCESS_KEY="ZZZZZ" \
+   dynamodb_table_sync \
+   src/cli.js \
+   --master us-east-1:my-dynamodb-table \
+   --slave us-west-2:my-dynamodb-table \
+   --slave eu-west-1:my-dynamodb-table \
+   --write-missing \
+   --write-differing
+```
+
+
 ### Installing Globally
 
 By installing the library globally (e.g. `npm install -g @silvermine/dynamodb-table-sync`),
