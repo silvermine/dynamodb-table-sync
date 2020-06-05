@@ -1,0 +1,13 @@
+.git
+tests/
+.dockerignore
+.eslintrc.json
+.gitignore
+.npmignore
+.nvmrc
+.travis.yml
+docker-compose.yml
+Dockerfile
+Gruntfile.js
+LICENSE
+README.md

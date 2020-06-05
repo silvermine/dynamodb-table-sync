@@ -1,0 +1,11 @@
+version: '3'
+
+services:
+   dynamodb_table_sync:
+      build:
+         context: ${PWD}
+         dockerfile: ${PWD}/Dockerfile
+         args:
+            NODE_JS_VERSION: ${NODE_JS_VERSION:-8}
+      volumes:
+         - ${PWD}/src:/opt/dynamodb-table-sync/src:rw
