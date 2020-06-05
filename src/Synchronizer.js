@@ -112,8 +112,7 @@ module.exports = Class.extend({
             readline.cursorTo(process.stdout, 0);
             process.stdout.write('(' + currentPercent + '%)');
 
-            nextProgressPercent =
-               currentPercent >= (nextProgressPercent + tick) ?
+            nextProgressPercent = currentPercent >= (nextProgressPercent + tick) ?
                (nextProgressPercent + tick) :
                (currentPercent + tick);
          } else {
@@ -205,7 +204,7 @@ module.exports = Class.extend({
                         slaveDef.approxItems
                      );
                   } else {
-                    // Simple . increment w/% logging
+                     // Simple . increment w/% logging
                      if (counter.get() === 0) {
                         console.log(
                            'Status: Comparing approximately %d items from the slave table to the master',
