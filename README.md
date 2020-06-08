@@ -95,6 +95,15 @@ synchronizer = new Synchronizer(
       writeDiffering: true,
    },
 );
+
+synchronizer.run()
+   .then(() => {
+      console.info('Done!');
+   })
+   .catch((err) => {
+      console.error(`Failed: ${err.message}`, err.stack);
+      process.exit(1);
+   });
 ```
 
 See the comments in [src/Synchronizer.js] for more documentation on names of options.
