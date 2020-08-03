@@ -94,7 +94,7 @@ module.exports = Class.extend({
          .then(this._outputStats.bind(this))
          .then(function() {
             if (self._abortScanning) {
-                process.exit(1);
+               throw new Error();
             }
          });
    },
