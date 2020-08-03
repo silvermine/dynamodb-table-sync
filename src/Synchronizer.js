@@ -91,7 +91,12 @@ module.exports = Class.extend({
             self._abortScanning = true;
             console.error('Encountered an error while comparing tables', err, err.stack);
          })
-         .then(this._outputStats.bind(this));
+         .then(this._outputStats.bind(this))
+         .then(function() {
+            if (self._abortScanning) {
+                process.exit(1);
+            }
+         });
    },
 
    trackScanProgress: function(enabled, approxItems, f) {
