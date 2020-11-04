@@ -7,6 +7,7 @@
     "dynamodb-table-sync": "src/cli.js"
   },
   "scripts": {
+    "commitlint": "commitlint --from eac7900",
     "test": "check-node-version --npm 6.13.4 && ./node_modules/.bin/istanbul cover ./node_modules/.bin/_mocha -- -R spec 'tests/**/*.test.js'"
   },
   "author": "Jeremy Thomerson",
@@ -38,9 +39,12 @@
     "underscore": "1.10.2"
   },
   "devDependencies": {
+    "@commitlint/travis-cli": "11.0.0",
     "@silvermine/eslint-config": "3.0.0-rc.0",
+    "@silvermine/standardization": "1.0.1",
     "check-node-version": "4.0.3",
     "coveralls": "3.1.0",
+    "eslint": "6.8.0",
     "expect.js": "0.3.1",
     "grunt": "1.1.0",
     "grunt-eslint": "22.0.0",
