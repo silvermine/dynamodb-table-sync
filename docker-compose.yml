@@ -6,6 +6,6 @@ services:
          context: ${PWD}
          dockerfile: ${PWD}/Dockerfile
          args:
-            NODE_JS_VERSION: ${NODE_JS_VERSION:-8}
+            NODE_JS_VERSION: ${NODE_JS_VERSION:-12.14.0}
       volumes:
          - ${PWD}/src:/opt/dynamodb-table-sync/src:rw
