@@ -110,11 +110,11 @@ if (_.isNumber(argv['scan-limit'])) {
    options.scanLimit = parseInt(argv['scan-limit'], 10);
 }
 
-if (_.isNumber(argv['batch-read-limit'])) {
-   options.batchReadLimit = parseInt(argv['batch-read-limit'], 10);
-} else {
-   options.batchReadLimit = 50;
-}
+options.batchReadLimit = _.isNumber(argv['batch-read-limit']) ? parseInt(argv['batch-read-limit'], 10) : 50;
+
+options.maxRetries = _.isNumber(argv['max-retries']) ? parseInt(argv['max-retries'], 10) : 10;
+
+options.retryDelayBase = _.isNumber(argv['retry-delay-base']) ? parseInt(argv['retry-delay-base'], 10) : 50;
 
 if (_.isNumber(argv.parallel)) {
    options.parallel = parseInt(argv.parallel, 10);

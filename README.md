@@ -153,6 +153,10 @@ the form `<region>:<table-name>`.
      requires recursive querying from the table, which we have not implemented at this
      time. Thus, if you get an error about `UnprocessedKeys`, you may need to lower this
      number to keep the responses within the size that DynamoDB can return.
+   * `--max-retries`: the maximum amount of retries to attempt with a request. Defaults
+     to 10 as in AWS SDK.
+   * `--retry-delay-base`: the base number of milliseconds to use in the exponential
+     backoff for operation retries on retryable errors. Defaults to 50 as in AWS SDK.
    * `--parallel`: a number of parallel scanners that should run concurrently. By default
      we do a serial scan using a single "thread" (so to speak). However, if you have a
      larger table and enough provisioned read capacity on the master and all slaves, we
