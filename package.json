@@ -1,6 +1,6 @@
 {
   "name": "@silvermine/dynamodb-table-sync",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "utility script for detecting and (optionally) fixing differences between multiple DynamoDB tables (in the same or different regions)",
   "main": "src/Synchronizer.js",
   "bin": {
