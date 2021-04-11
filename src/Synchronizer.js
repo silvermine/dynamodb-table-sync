@@ -23,6 +23,8 @@ module.exports = Class.extend({
     *    startingKey: { hashKey: 'abc', rangeKey: 'xyz' },
     *    scanLimit: 100,
     *    batchReadLimit: 50,
+    *    maxRetries: 10,
+    *    retryDelayBase: 50,
     *    parallel: 4,
     *    slaveCredentials: AWSCredentialsProvider(...),
     * }
@@ -30,10 +32,12 @@ module.exports = Class.extend({
     *
     * @class Synchronizer
     * @param master {object} table definition { region: 'region', name: 'table-name' }
-    * @param slave {object[]} array of table definitions
+    * @param slaves {object[]} array of table definitions
     * @param opts {object} options to determine how this class operates
     */
    init: function(master, slaves, opts) {
+      this._opts = _.extend({ batchReadLimit: 50, maxRetries: 10, retryDelayBase: 50 }, opts);
+
       this._master = _.extend({}, master, { id: (master.region + ':' + master.name), docs: this._makeDocClient(master) });
 
       this._slaves = _.map(slaves, function(def) {
@@ -41,7 +45,6 @@ module.exports = Class.extend({
       }.bind(this));
 
       this._abortScanning = false;
-      this._opts = _.extend({ batchReadLimit: 50 }, opts);
 
       this._stats = _.reduce(this._slaves, function(stats, slave) {
          stats[slave.id] = { extra: 0, sameAs: 0, differing: 0, missing: 0 };
@@ -567,7 +570,14 @@ module.exports = Class.extend({
    },
 
    _makeDocClient: function(def, creds) {
-      return new AWS.DynamoDB.DocumentClient({ region: def.region, credentials: creds || AWS.config.credentials });
+      return new AWS.DynamoDB.DocumentClient({
+         region: def.region,
+         credentials: creds || AWS.config.credentials,
+         maxRetries: this._opts.maxRetries,
+         retryDelayOptions: {
+            base: this._opts.retryDelayBase,
+         },
+      });
    },
 
    _outputStats: function() {
