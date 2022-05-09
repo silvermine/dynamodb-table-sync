@@ -238,6 +238,26 @@ the slave table(s).
 See the heading below entitled "Authentication and Authorization to AWS DynamoDB API" for
 more information related to credentials.
 
+### Syncing Tables to Local Instance
+
+When developing locally using the DynamoDB emulator or Docker image, it can be useful to pull
+data from upstream environments.
+
+See the [AWS documentation on how to set up the emulator or Docker image for local development](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.DownloadingAndRunning.html).
+
+To synchronize from a remote table to a local table, set the `--slave-profile` parameter
+to the URL of the local endpoint:
+
+```bash
+node src/cli.js \
+   --master us-east-1:my-dynamodb-table \
+   --slave-profile http://localhost:8000 \
+   --slave us-west-2:my-dynamodb-table \
+   --write-missing \
+   --write-differing
+```
+
+Note: the region does not matter on the `--slave`; feel free to use any valid region.
 
 ### "Dry Run" Mode
 
@@ -317,7 +337,6 @@ receives will only last for one hour, and cannot be refreshed without a new MFA 
 (which the script does not attempt to implement). Thus, the provisioned capacity,
 parallelism, and related limiting arguments must be configured to allow your entire table
 to be scanned during a single hour if you are using MFA.
-
 
 ### What Permissions Are Needed?
 

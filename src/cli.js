@@ -156,8 +156,13 @@ if (!_.isEmpty(argv.profile)) {
 AWS.config.credentials = setupRoleRelatedCredentials('', 'for master', AWS.config.credentials);
 
 if (!_.isEmpty(argv['slave-profile'])) {
-   console.log('Setting AWS credentials provider to use profile %s for slaves', argv['slave-profile']);
-   options.slaveCredentials = new AWS.SharedIniFileCredentials({ profile: argv['slave-profile'] });
+   if (argv['slave-profile'].indexOf('localhost') > -1) {
+      console.log('Using localhost endpoint.');
+      options.localhostTarget = argv['slave-profile'];
+   } else {
+      console.log('Setting AWS credentials provider to use profile %s for slaves', argv['slave-profile']);
+      options.slaveCredentials = new AWS.SharedIniFileCredentials({ profile: argv['slave-profile'] });
+   }
 }
 
 options.slaveCredentials = setupRoleRelatedCredentials('slave-', 'for slaves', options.slaveCredentials || AWS.config.credentials);
