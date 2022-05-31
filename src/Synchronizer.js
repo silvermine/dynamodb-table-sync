@@ -44,9 +44,9 @@ module.exports = Class.extend({
          var client;
 
          if (opts.localhostTarget) {
-            this._makeLocalDocClient(def, opts.localhostTarget);
+            client = this._makeLocalDocClient(def, opts.localhostTarget);
          } else {
-            this._makeDocClient(def, opts.slaveCredentials);
+            client = this._makeDocClient(def, opts.slaveCredentials);
          }
 
          return _.extend({}, def, { id: (def.region + ':' + def.name), docs: client });
