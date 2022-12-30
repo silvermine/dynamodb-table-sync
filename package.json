@@ -8,7 +8,7 @@
   },
   "scripts": {
     "commitlint": "commitlint --from eac7900",
-    "test": "check-node-version --npm 6.14.12 && nyc mocha -- 'tests/**/*.test.js'",
+    "test": "check-node-version --npm 8.5.5 && nyc mocha -- 'tests/**/*.test.js'",
     "standards": "npm run commitlint && grunt standards"
   },
   "author": "Jeremy Thomerson",
