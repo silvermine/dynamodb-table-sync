@@ -8,8 +8,10 @@
   },
   "scripts": {
     "commitlint": "commitlint --from eac7900",
-    "test": "check-node-version --npm 6.14.12 && nyc mocha -- 'tests/**/*.test.js'",
-    "standards": "npm run commitlint && grunt standards"
+    "test": "check-node-version --npm 8.5.5 && nyc mocha -- 'tests/**/*.test.js'",
+    "eslint": "eslint .",
+    "markdownlint": "markdownlint -c .markdownlint.json '{,!(node_modules)/**/}*.md'",
+    "standards": "npm run commitlint && npm run markdownlint && npm run eslint"
   },
   "author": "Jeremy Thomerson",
   "license": "MIT",
@@ -43,13 +45,11 @@
     "@commitlint/cli": "12.1.1",
     "@commitlint/travis-cli": "11.0.0",
     "@silvermine/eslint-config": "3.0.1",
-    "@silvermine/standardization": "1.0.3",
+    "@silvermine/standardization": "2.0.0",
     "check-node-version": "4.0.3",
     "coveralls": "3.1.0",
     "eslint": "6.8.0",
     "expect.js": "0.3.1",
-    "grunt": "1.4.0",
-    "grunt-eslint": "22.0.0",
     "mocha": "8.4.0",
     "nyc": "15.1.0",
     "rewire": "5.0.0",
