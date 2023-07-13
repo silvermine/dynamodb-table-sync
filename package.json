@@ -37,7 +37,7 @@
   "dependencies": {
     "aws-sdk": "2.690.0",
     "class.extend": "0.9.2",
-    "minimist": "1.2.5",
+    "minimist": "1.2.6",
     "q": "1.5.1",
     "underscore": "1.13.1"
   },
