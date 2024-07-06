@@ -19,6 +19,7 @@ argvOpts = {
       'role-arn',
       'mfa-serial',
       'mfa-token',
+      'slave-endpoint',
       'slave-profile',
       'slave-role-arn',
       'slave-mfa-serial',
@@ -158,6 +159,10 @@ AWS.config.credentials = setupRoleRelatedCredentials('', 'for master', AWS.confi
 if (!_.isEmpty(argv['slave-profile'])) {
    console.log('Setting AWS credentials provider to use profile %s for slaves', argv['slave-profile']);
    options.slaveCredentials = new AWS.SharedIniFileCredentials({ profile: argv['slave-profile'] });
+}
+
+if (!_.isEmpty(argv['slave-endpoint'])) {
+   options.slaveEndpoint = argv['slave-endpoint'];
 }
 
 options.slaveCredentials = setupRoleRelatedCredentials('slave-', 'for slaves', options.slaveCredentials || AWS.config.credentials);

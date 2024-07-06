@@ -238,6 +238,29 @@ the slave table(s).
 See the heading below entitled "Authentication and Authorization to AWS DynamoDB API" for
 more information related to credentials.
 
+### Syncing Tables to a Local DynamoDB Instance
+
+When developing locally using the DynamoDB emulator or Docker image, it can be useful to pull
+data from upstream environments.
+
+See the [AWS documentation][local-setup] on how to set up the emulator or Docker image for
+local development.
+
+To synchronize from a remote table to a local table, set the `--slave-endpoint` parameter
+to the URL of the local endpoint, and set the rest of the parameters as you normally
+would. Note that slave credential parameters will be ignored when using the
+`--slave-endpoint` param. For example:
+
+```bash
+node src/cli.js \
+   --master us-east-1:my-dynamodb-table \
+   --slave-endpoint http://localhost:8000 \
+   --slave us-west-2:my-dynamodb-table \
+   --write-missing \
+   --write-differing
+```
+
+Note: the region does not matter on the `--slave`; feel free to use any valid region.
 
 ### "Dry Run" Mode
 
@@ -354,3 +377,4 @@ details.
 [contributing]: https://github.com/silvermine/silvermine-info#contributing
 [envvars]: http://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/loading-node-credentials-environment.html
 [credsfile]: http://docs.aws.amazon.com/sdk-for-javascript/v2/developer-guide/loading-node-credentials-shared.html
+[local-setup]: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.DownloadingAndRunning.html

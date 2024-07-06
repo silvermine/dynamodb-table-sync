@@ -41,7 +41,9 @@ module.exports = Class.extend({
       this._master = _.extend({}, master, { id: (master.region + ':' + master.name), docs: this._makeDocClient(master) });
 
       this._slaves = _.map(slaves, function(def) {
-         return _.extend({}, def, { id: (def.region + ':' + def.name), docs: this._makeDocClient(def, opts.slaveCredentials) });
+         var client = this._makeDocClient(def, opts.slaveCredentials, opts.slaveEndpoint);
+
+         return _.extend({}, def, { id: (def.region + ':' + def.name), docs: client });
       }.bind(this));
 
       this._abortScanning = false;
@@ -507,7 +509,8 @@ module.exports = Class.extend({
    _compareTableDescriptions: function() {
       var def = Q.defer(),
           describeMaster = this._describeTable(this._master),
-          describeSlaves = Q.all(_.map(this._slaves, _.partial(this._describeTable.bind(this), _, this._opts.slaveCredentials)));
+          slaveDescribeFn = _.partial(this._describeTable.bind(this), _, this._opts.slaveCredentials, this._opts.slaveEndpoint),
+          describeSlaves = Q.all(_.map(this._slaves, slaveDescribeFn));
 
       function logDescription(title, tableDef, tableDesc) {
          console.log('%s table %s', title, tableDef.id);
@@ -560,8 +563,14 @@ module.exports = Class.extend({
       return def.promise;
    },
 
-   _describeTable: function(tableDef, creds) {
-      var dyn = new AWS.DynamoDB({ region: tableDef.region, credentials: creds || AWS.config.credentials });
+   _describeTable: function(tableDef, creds, endpoint) {
+      var dyn;
+
+      dyn = new AWS.DynamoDB({
+         region: tableDef.region,
+         endpoint: endpoint,
+         credentials: (endpoint ? undefined : (creds || AWS.config.credentials)),
+      });
 
       return Q.ninvoke(dyn, 'describeTable', { TableName: tableDef.name })
          .then(function(resp) {
@@ -569,10 +578,11 @@ module.exports = Class.extend({
          });
    },
 
-   _makeDocClient: function(def, creds) {
+   _makeDocClient: function(def, creds, endpoint) {
       return new AWS.DynamoDB.DocumentClient({
          region: def.region,
-         credentials: creds || AWS.config.credentials,
+         endpoint: endpoint,
+         credentials: (endpoint ? undefined : (creds || AWS.config.credentials)),
          maxRetries: this._opts.maxRetries,
          retryDelayOptions: {
             base: this._opts.retryDelayBase,
