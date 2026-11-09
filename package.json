@@ -8,7 +8,7 @@
   },
   "scripts": {
     "commitlint": "commitlint --from eac7900",
-    "test": "check-node-version --npm 8.5.5 && nyc mocha -- 'tests/**/*.test.js'",
+    "test": "check-node-version --npm 11.19.1 && nyc mocha -- 'tests/**/*.test.js'",
     "eslint": "eslint .",
     "markdownlint": "markdownlint -c .markdownlint.json '{,!(node_modules)/**/}*.md'",
     "standards": "npm run commitlint && npm run markdownlint && npm run eslint"
